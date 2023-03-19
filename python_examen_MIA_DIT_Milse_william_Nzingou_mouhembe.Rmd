@@ -1,0 +1,446 @@
+---
+output: 
+  pdf_document:
+    citation_package: natbib
+    keep_tex: true
+    fig_caption: true
+    latex_engine: pdflatex
+    template: ./svm-latex-ms.tex
+bibliography: master.bib
+header-includes:
+  -  \usepackage{hyperref}
+  - \usepackage{array}   
+  - \usepackage{caption}
+  - \usepackage{graphicx}
+  - \usepackage{siunitx}
+  - \usepackage[table]{xcolor}
+  - \usepackage{multirow}
+  - \usepackage{hhline}
+  - \usepackage{calc}
+  - \usepackage{tabularx}
+  - \usepackage{fontawesome}
+  - \usepackage[para,online,flushleft]{threeparttable}
+biblio-style: apsr
+title: "An article on the Duckdb database, python and an application to data analysis."
+thanks: "Replication files are available on the author's Github account (https://github.com/dgeoCongo/python_examen_MIA_DIT_Milse_william_Nzingou_mouhembe). **Current version**: `r Sys.Date()`; **Corresponding author**: milsedatascience@gmail.com."
+author:
+- name: Milse William NZINGOU MOUHEMBE
+  affiliation: Dakar Institute of Technology
+abstract: "This article gives a brief overview of the Duckdb database and its benefits. It then presents an application to sales data analysis."
+keywords: "Duckdb, data base, python, data analysis, sql."
+date: "`r Sys.Date()`"
+geometry: margin=1in
+fontfamily: libertine
+fontsize: 11pt
+# spacing: double
+endnote: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE,
+                      message=FALSE, warning=FALSE,
+                      fig.path='figs/',
+                      cache.path = '_cache/',
+                      fig.process = function(x) {
+                      x2 = sub('-\\d+([.][a-z]+)$', '\\1', x)
+                      if (file.rename(x, x2)) x2 else x
+                      })
+
+library(ggplot2)
+library(reticulate)
+use_python("C:/Users/User/AppData/Local/Programs/Python/Python310/python.exe")
+```
+
+
+# Introduction
+as a data analyst or data scientist a typical walkthrough is to load data from a csv file perform preprocessing steps and run your analysis.
+To achieve those things you pull up a jupiter notebook in numpy and pandas then execute your queries. The thing is this process can be extremely time consuming and painful just to run like quick analysis on your files you shouldn't to do all of that if you have a bunch of csv or others files and you want to run a quick and easy data analysis on those files. Duckdb is the easiest and fastest way to do that also cleaning data with pandas can be slow especially if you use joins, aggregations and so on and ressource consuming in fact if you process data that goes beyond the memory that you have on your machine then you will get an error. Another thing is most of the operations you perform with pandas can be done with sql why not using sql as you can do more with less so now we know why duckdb let's define exactely what is the database(db) there database is an in-process or lab database management system(dbms) so what in process means? in process means that the dbms runs within the process you are trying to access it from like sqlite the db can run in-memory or presses the data on a single file there is no client server setup like postgres or communication protocol. To manage duckdb is a lightweight in-process dbms with no external dependencies that runs on a single machine the db is an OLAP database usually you have OLTP databases and OLAP databases well TP databases are designed to handle large transactional data think of updates or inserts whereas or lab databases
+and what differentiate the two is how the data is stored OLTP databases are usually row oriented databases that organize data by record keeping all of the data associated with a record next to each other in memory and they are optimized for reading and writing rows efficiently whereas or lab databases are usually column-oriented databases that organized data by column keeping all of the data associated with the column next to each other in memory so they are very optimized for reading
+and computing on columns efficiently that's exactly the cases with dagdb dagdb is optimized to perform complex queries on data such as joints aggregations groupings Etc...there are many reasons why duckdb is so fast at performing data analyzes on Big Data such it is a column database it supports vectorized processing and MVCC to be ACID compliant. I won't go into the details of those concepts feel free to check on the internet they are very interesting that said that DB brings a friendlier sql so you have access to some  keywords like exclude, replays group by all order by all and so on to make some sql requests easier to write and to read  techdv has many APIS such as python or Java, C++ and so on so you can interact with duckdb from your favorite language that said you have some integrations as well so you can manipulate data on top of pandas, parquet or arrow  to sum up you can think of that db as the sqlite for analytics it fills the Gap in embedded databases for online analytical processing that's why duckdb is so popular right now it runs complex sql queries to analyze your data  in a very efficient and fast way you have the simplicity of sqlite with the functionalities of snowflake on a local machine and this is game changer okay you know why duckcdb what is the db what about the limits of the db first limit of duckdb is that runs on a single machine it is not mean to be distributed among many machines and that’s not really an issue actually because most of the time you don’t have to distribute your workload among many machines the thing is that db is very efficient and fast so even if you have data that goes beyond the memory that you have on your machine that’s okay it can perform data analysis on this data as well also duckdb is truly a single player experience it operates on a single file on disk if you have many users many teams that want to use the DB to share data and so on might not be the best user experience also docdb should not be used for transactions keep in mind that it is designed for analytical workloads  then last but not least if you have many concurrent connections to be read only you cannot have many rights at the same time exactly like with equal light that’s it about the theory. 
+
+
+# 1- Duckdb saves times compared to pandas.
+
+Here we will compare the process of concatenating data from several csv files between pandas and duckdb. All datas are in the same fowlder names data.
+
+```{r echo=FALSE, out.width = "100%", fig.align = "center"}
+knitr::include_graphics("images/data_sale.png")
+```
+
+```{python libraries}
+import glob
+import time
+import pandas as pd
+import duckdb
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+conn = duckdb.connect()
+```
+## Here I will calculate the time to spend to do this concatation using pandas.
+
+```{python}
+start_time = time.time()
+d = pd.concat([pd.read_csv(f) for f in glob.glob('data/*.csv')])
+print(f"time = {(time.time() - start_time)}")
+#print(d.head(2))
+```
+
+## Here I will calculate the time to spend to do this concatation using Duckdb.
+
+```{python}
+start_time = time.time()
+df = conn.execute(""" SELECT * FROM 
+read_csv_auto('data/*.csv', header = True) """).df()
+print(f"time1 = {(time.time() - start_time)}")
+#print(df.head(2))
+#df.describe() 
+```
+
+We can see from the two examples above that for the same job done with pandans and duckdb, the script runs faster with duckdb.
+
+# 2- An appliocation to data analysis.
+
+```{python list columns}
+conn.register("df_view", df)
+conn.execute("DESCRIBE df_view").df()
+
+conn.execute("SELECT COUNT(*) FROM df_view").df()
+
+df.isnull().sum()
+
+df = df.dropna(how = 'all')
+conn.execute("SELECT COUNT(*) FROM df").df()
+
+# We have a problem with the data that has text repetition
+df['Quantity Ordered'].unique()
+
+filter_text = df['Quantity Ordered'] != 'Quantity Ordered'
+
+# Replacing data without text values in quantity ordered
+df = df[filter_text]
+
+df['Quantity Ordered'].unique()
+
+```
+Now, the data has no text repetition.
+
+## 2.1 Changing 'Quantity Ordered' and 'Price Each' Data Type
+```{python}
+# Convert the 'Quantity Ordered' and 'Price Each' data type to numeric data type (int and float)
+df['Quantity Ordered'], df['Price Each'] = df['Quantity Ordered'].astype('int64'), df['Price Each'].astype('float')
+df.info()
+```
+## 2.2 Changing 'Order Date' Data Type
+
+```{python}
+df['Order Date'] = pd.to_datetime(df['Order Date']) # change to date-time type data
+#df
+```
+## 2.3 Adding Month, Hour, Minute, Revenue, and City Column
+```{python}
+# Create Year, Month, Hour, Minute Column
+df['Year'] = df['Order Date'].dt.year
+df['Month'] = df['Order Date'].dt.month
+df['Hour'] = df['Order Date'].dt.hour
+df['Minute'] = df['Order Date'].dt.minute
+
+# Create Revenue Column
+df['Revenue'] = df['Price Each'] * df['Quantity Ordered']
+
+# Get City name from 'Purchase Address'
+# city = df['Purchase Address'].str.split(",",expand=True)
+
+
+```
+```{python}
+# Get City name from 'Purchase Address'
+city = (df['Purchase Address'].str.split(", ",expand=True))[1]
+
+city#[1]
+```
+
+```{python}
+# Create City Column
+df['City'] = city
+```
+
+## 2.3 Cleaned Data Recap
+```{python}
+# Check number of unique values for each column
+n = df.nunique(axis=0)
+
+df.columns # listing cleaned data columns
+
+df['Year'].unique()
+
+df = df[df.Year != 2020] # drop rows that contain '2020' in Year column
+
+n = df.nunique(axis=0)
+  
+print("Number of unique values in each column for 2019 data:\n",n)
+```
+
+# 3- Data Analysis
+## 3-1 What is the total number of sales?
+```{python}
+year_sales = df.groupby('Year').agg({'Quantity Ordered' : 'sum', 'Price Each' : 'mean', 'Revenue' : 'sum'})
+year_sales
+```
+The total sales in 2019 were USD 34.483.365 with 209.038 products sold.
+
+## 3-2 Basic Analysis
+```{python}
+product_sales = df.groupby('Product').agg({'Quantity Ordered' : 'sum', 'Price Each' : 'mean', 'Revenue' : 'sum'})
+print('Quantity Ordered, Price Each, and Revenue By Product')
+product_sales
+```
+```{python}
+# Statistical measure of sales data (numeric)
+sales_data_numeric = df.describe(include=[np.number]) 
+print("Statistical Measure of Numeric Type Sales Data")
+sales_data_numeric
+```
+```{python}
+# statistical measure of sales data (object / string)
+sales_data_object = df.describe(exclude=[np.number],datetime_is_numeric=True)
+print("Statistical Measure of Object / String Type Sales Data")
+sales_data_object
+```
+
+```{python}
+plt.figure(figsize=(16, 12))
+sns.heatmap(df[['Quantity Ordered', 'Price Each', 'Month', 'Hour', 'Minute', 'Revenue']].corr(), 
+            annot=True, cmap='Blues',linewidths=0.005, linecolor='Black')
+
+plt.title("Sales Data Correlation", weight="bold", fontsize=28, pad=20) # title
+plt.xticks(weight="bold", fontsize=10) # x-ticks
+plt.yticks(weight="bold", fontsize=10); # y-ticks
+plt.show()
+```
+
+## 3.3 Average sales per month
+
+```{python}
+avg_month_sales = df.groupby('Month').agg({'Revenue' : 'mean'})
+```
+```{python}
+plt.rcParams['figure.figsize']=(10,5)
+avg_month_sales.plot(kind='bar', color='#0D4C92')
+plt.title('Average Sales by Month', weight='bold', fontsize=15, pad=15)
+plt.ylim(0, 250)
+plt.ylabel('Revenue (US$)', weight='bold')
+plt.xlabel('Month', weight='bold')
+plt.show()
+```
+In 2019, May has the highest average revenue with USD 190.305852, while September has the lowest average revenue with USD 180.497387.
+
+## 3.4 The best month for sales? How much was earned that month?
+```{python}
+total_month_sales = df.groupby('Month',as_index=False).agg({'Quantity Ordered':'sum', 'Revenue':'sum'})
+print('Total Sales by Month')
+total_month_sales
+```
+
+```{python}
+plt.rcParams['figure.figsize']=(10,5)
+ay = sns.barplot(x='Month',y='Revenue', data=total_month_sales, color='#0D4C92')
+plt.title('Total Sales by Month', weight='bold', fontsize=15, pad=15)
+plt.ylabel('Revenue (US$)', weight='bold')
+plt.xlabel('Month', weight='bold')
+
+ylabels = ['{:,.1f}'.format(y) + ' M' for y in ay.get_yticks()/1000000]
+ay.set_yticks(ay.get_yticks())  # just get and reset whatever you already have
+ay.set_yticklabels(ylabels);  # set the new/modified labels
+plt.show()
+```
+From the graph above we can tell that December is the best month for sales with USD 4.613.443 total revenue. The reason behind this may be because there's Christmas and the holiday in December where it's the momentum to buy a new product as a gift or for themself.
+
+## 3.5 City with the highest number of sales
+
+```{python}
+city_sales = df.groupby('City',
+as_index=False).agg({'Quantity Ordered':'sum',
+'Revenue':'sum'})
+# print('Total Sales by City')
+# city_sales
+```
+
+```{python}
+plt.rcParams['figure.figsize']=(10,5)
+ax = sns.barplot(x='Revenue',y='City', data=city_sales.sort_values('Revenue',
+ascending=False))
+plt.title('Total Sales by City', weight='bold', fontsize=15, pad=15)
+plt.ylabel('City', weight='bold')
+plt.xlabel('Revenue (US$)', weight='bold')
+
+xlabels = ['{:,.1f}'.format(y) + ' M' for y in ax.get_xticks()/1000000]
+ax.set_xticks(ax.get_xticks())  # just get and reset whatever you already have
+ax.set_xticklabels(xlabels);  # set the new/modified labels
+plt.show()
+```
+San Francisco had the highest total sales in 2019 with USD 8.259.719. We need further information and study about the demographic, economic, and advertising to figure out why San Fransisco had the highest sales compared to other cities in the USA.
+
+## 3.6 The product sold the most and Why it sold the most.
+```{python}
+product_sales = df.groupby('Product',as_index=False).agg({'Quantity Ordered':'sum'}).sort_values('Quantity Ordered', ascending=False)
+product_sales
+```
+```{python}
+plt.rcParams['figure.figsize']=(10,5)
+q5 = sns.barplot(x='Quantity Ordered',y='Product', data=product_sales.sort_values(
+'Quantity Ordered',ascending=False),color='#0D4C92')
+plt.title('Quantity Ordered by Product',
+weight='bold', fontsize=15, pad=15)
+plt.xlabel('Quantity Ordered', weight='bold')
+plt.ylabel('Product', weight='bold')
+plt.show()
+```
+
+From the graph above we can tell that the most sold products in 2019 were AAA Batteries (4-pack) with 31.012 products ordered. We also can tell that AA Batteries (4-pack), USB-C Charging Cable, Lightning Charging Cable, and Wired Headphones sold more than other products. Why do these products sell more than others? My first impression is that their price is lower than other products. So, let's do further analysis to check our hypothesis by overlaying the graph with product price.
+
+```{python}
+ # lets prepare the varables for the plotting
+# group the product
+product_group = df.groupby('Product')
+quantity_ordered = product_group.sum(
+['Quantity Ordered'])['Quantity Ordered']
+prices = df.groupby('Product').mean(
+['Price Each'])['Price Each']
+products = [product for product, df1 in product_group]
+"""Visualization"""
+# let's make a subplots
+fig, ax1 = plt.subplots(figsize=(12, 6))
+ax2 = ax1.twinx()
+
+# AXES 1
+ax1.bar(products, quantity_ordered)
+ax1.set_title( # title
+    "Quantity Ordered and Price by Product",
+    weight="bold", # weight
+    fontsize=15, # font-size
+    pad=15 # padding
+)
+
+ax1.set_xlabel( # x-label
+    "Product",
+    weight="bold", # weight
+    color="black" # color
+)
+ax1.set_ylabel( # y-label
+    "Quantity Ordered", 
+    color="blue", # color
+    weight="bold" # weight
+)
+ax1.tick_params(axis='x', labelrotation = 90)
+
+# AXES 2
+ax2.plot( # plot
+    products, # x-axis
+    prices, # y-axis
+    color="red",
+    marker='o'
+)
+ax2.set_ylabel( # y-label
+    "Price (US$)", 
+    color="red", # color
+    weight="bold" # weight
+)
+ax2.set_ylim(0)
+plt.show()
+```
+We can say that our hypothesis is true, high-sold products have a low price. The high-sold products also had a lot of demand in the market that was used eventually in daily activity.
+
+
+```{python}
+df['Quantity Ordered'] = pd.to_numeric(df['Quantity Ordered'],
+errors = 'coerce')
+df['Price Each'] = pd.to_numeric(df['Price Each'],
+errors = 'coerce')
+```
+
+```{python}
+# data used in this section
+temp_data = df.groupby(['Month']).sum().reset_index()
+
+#
+fig, axes = plt.subplots(2, 1, figsize = (40,25))
+fig.subplots_adjust(hspace=.3)
+# Sale
+sns.barplot(x='Month', y='Revenue', data=temp_data, ax=axes[0])
+axes[0].set_xlabel(axes[0].get_xlabel(), size=30)
+axes[0].set_ylabel(axes[0].get_ylabel(), size=30)
+axes[0].set_xticklabels(axes[0].get_xticklabels(), size=30)
+axes[0].bar_label(axes[0].containers[0], fmt='%.2f', size=25)
+axes[0].set_title('Total Sales per Month', size= 40)
+
+# -------
+
+# 
+sns.barplot(x='Month', y='Quantity Ordered', data=temp_data, ax=axes[1])
+axes[1].set_xlabel(axes[1].get_xlabel(), size=30)
+axes[1].set_ylabel(axes[1].get_ylabel(), size=30)
+axes[1].set_xticklabels(axes[1].get_xticklabels(), size=30)
+axes[1].bar_label(axes[1].containers[0], fmt='%.2f', size=25)
+axes[1].set_title('Total Quantity Ordered per Month', size= 40)
+plt.show()
+```
+## 3.7 How much and how many did we sell in each city? (Bar Chart)?
+
+```{python}
+# data used in this section
+temp_data = df.groupby(['City']).sum().reset_index()
+
+#
+fig, axes = plt.subplots(2, 1, figsize = (50, 30))
+sns.barplot(x='City', y='Revenue', data=temp_data, ax=axes[0])
+axes[0].set_xlabel(axes[0].get_xlabel(), size=30)
+axes[0].set_ylabel(axes[0].get_ylabel(), size=30)
+axes[0].set_xticklabels(axes[0].get_xticklabels(), size=30)
+axes[0].bar_label(axes[0].containers[0], fmt='%.2f', size=25)
+axes[0].set_title('h', size= 40)
+
+# -------
+
+# 
+sns.barplot(x='City', y='Quantity Ordered', data=temp_data, ax=axes[1])
+axes[1].set_xlabel(axes[1].get_xlabel(), size=30)
+axes[1].set_ylabel(axes[1].get_ylabel(), size=30)
+axes[1].set_xticklabels(axes[1].get_xticklabels(), size=30)
+axes[1].bar_label(axes[1].containers[0], fmt='%.2f', size=25)
+axes[1].set_title('h', size= 40)
+```
+```{python}
+# 'Postal Code', 'State', 
+temp_data = df.groupby(['City']).sum().reset_index()
+```
+```{python}
+# data used in this section
+temp_data = pd.concat([df.groupby(['Hour']).count()['Product'], 
+df.groupby(['Hour']).sum()[['Revenue',
+'Quantity Ordered']]], axis=1).reset_index()
+temp_data.columns = ['Hour', 'Number of Orders',
+'Total Sale', 'Quantity Ordered']
+```
+We can find a thorough rush hour analysis in the below plot based on the Quantity Ordered, Number of Orders, and Total Sales in each hour.
+```{python}
+fig, axes = plt.subplots(2, 1, figsize = (50, 50))
+
+axes[0].plot(temp_data['Hour'],
+temp_data['Quantity Ordered'], '-p', color='blue', markerfacecolor='blue', 
+             markersize=20, linewidth=4,
+             label = "Quantity Ordered")
+axes[0].plot(temp_data['Hour'],
+temp_data['Number of Orders'], '-p', color='red', markerfacecolor='red', 
+             markersize=20, linewidth=4,
+             label = "Number of Orders")
+axes[0].legend(fontsize=25)
+
+axes[1].plot(temp_data['Hour'],
+temp_data['Total Sale'], '-p', 
+color='black', markerfacecolor='black', 
+             markersize=20, linewidth=4,
+             label = "Total Sale")
+axes[1].legend(fontsize=25)
+```
+
